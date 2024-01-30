@@ -98,10 +98,13 @@ func main() {
 			if !ctx.Bool("nocheck") {
 				// Sanity check
 				minEdge := (nodeNum[0] + 2*nodeNum[1] + nodeNum[2]) / 2
-				maxEdge := (2*nodeNum[0] + nodeNum[2] + 1) * nodeNum[1] / 2
+				maxEdge := (nodeNum[0] + nodeNum[2]) * nodeNum[1]
 				if edgeNum < minEdge || edgeNum > maxEdge {
 					return fmt.Errorf("flag edge out of bound for current input, valid range [%v-%v], current %v",
 						minEdge, maxEdge, edgeNum)
+				}
+				if nodeNum[2] > nodeNum[1] {
+					return fmt.Errorf("number of OR node cannot be greater than number of AND node")
 				}
 			}
 			return nil
@@ -110,8 +113,4 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func constructGraph(leaf, and, or, edge int, cycle bool) {
-
 }
