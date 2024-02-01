@@ -52,7 +52,7 @@ func main() {
 				Name:        "seed",
 				Usage:       "random seed",
 				Aliases:     []string{"s"},
-				Value:       time.Now().Unix(),
+				Value:       time.Now().UnixNano(),
 				DefaultText: "current Unix epoch in seconds",
 			},
 			&cli.StringFlag{
