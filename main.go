@@ -13,7 +13,7 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.IntSliceFlag{
 				Name:     "node",
-				Usage:    "number of PF, AND, and OR nodes",
+				Usage:    "number of OR, PF and AND nodes (in this order)",
 				Aliases:  []string{"n"},
 				Required: true,
 				Action: func(ctx *cli.Context, input []int) error {
@@ -84,28 +84,32 @@ func main() {
 				DefaultText: "false",
 			},
 			&cli.BoolFlag{
-				Name:        "nocheck",
-				Usage:       "disable basic input validation checks (may result in invalid graphs)",
+				Name:        "relaxed",
+				Usage:       "relax the constraint so that AND node can have multiple outgoing edges",
 				Value:       false,
 				DefaultText: "false",
 			},
 		},
 		Action: func(ctx *cli.Context) error {
-			// PF AND OR
 			nodeNum := ctx.IntSlice("node")
+			or := nodeNum[0]
+			leaf := nodeNum[1]
+			and := nodeNum[2]
 			edgeNum := ctx.Int("edge")
 
-			if !ctx.Bool("nocheck") {
-				// Sanity check
-				minEdge := (nodeNum[0] + 2*nodeNum[1] + nodeNum[2]) / 2
-				maxEdge := (nodeNum[0] + nodeNum[2]) * nodeNum[1]
-				if edgeNum < minEdge || edgeNum > maxEdge {
-					return fmt.Errorf("flag edge out of bound for current input, valid range [%v-%v], current %v",
-						minEdge, maxEdge, edgeNum)
-				}
-				if nodeNum[2] > nodeNum[1] {
+			minEdge := (leaf + 2*and + or) / 2
+			var maxEdge int
+			if !ctx.Bool("relaxed") {
+				maxEdge = leaf*and + or*and
+				if or > and {
 					return fmt.Errorf("number of OR node cannot be greater than number of AND node")
 				}
+			} else {
+				maxEdge = (2*leaf + or + 4) * and / 2
+			}
+			if edgeNum < minEdge || edgeNum > maxEdge {
+				return fmt.Errorf("flag edge out of bound for current input, valid range [%v-%v], current %v",
+					minEdge, maxEdge, edgeNum)
 			}
 			return nil
 		},

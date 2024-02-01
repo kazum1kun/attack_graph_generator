@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	al "github.com/ugurcsen/gods-generic/lists/arraylist"
 	set "github.com/ugurcsen/gods-generic/sets/hashset"
+	"log"
 	"math/rand"
 )
 
@@ -24,10 +26,18 @@ type CNode struct {
 	Adj  set.Set[int]
 }
 
-func constructGraph(leaf, and, or, edge int, cycle, noCheck bool, seed int64) {
+func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) *[]*CNode {
 	rnd := rand.New(rand.NewSource(seed))
+	// We first construct 4 lists:
+	// inRequiredOr is the list of OR that needs an inbound edge
+	inRequiredOr := al.New[int]()
+	// inRequiredAnd is the list of AND that needs an inbound edge
+	inRequiredAnd := al.New[int]()
+	// outRequiredOr is the list of OR/LEAF that needs an outbound edge
+	outRequiredOr := al.New[int]()
+	// outRequiredAnd is the list of AND that needs an outbound edge
+	outRequiredAnd := al.New[int]()
 
-	// Initialize CNodes for all nodes
 	// Initialize CNodes for all nodes
 	V := make([]*CNode, leaf+and+or+1)
 	for i := 1; i <= leaf+and+or; i++ {
@@ -40,25 +50,31 @@ func constructGraph(leaf, and, or, edge int, cycle, noCheck bool, seed int64) {
 			iCap = and
 			oCap = 0
 			desc = "goal"
-		} else if i <= leaf {
-			_type = LEAF
-			iCap = 0
-			oCap = and
-			desc = fmt.Sprintf("p%v", i-1)
-		} else if i <= leaf+or {
+			inRequiredOr.Add(i)
+		} else if i <= or {
 			_type = OR
 			iCap = and
 			oCap = (or - 1) * and
 			desc = fmt.Sprintf("d%v", i-leaf-1)
+			inRequiredOr.Add(i)
+			outRequiredOr.Add(i)
+		} else if i <= or+leaf {
+			_type = LEAF
+			iCap = 0
+			oCap = and
+			desc = fmt.Sprintf("p%v", i-1)
+			outRequiredOr.Add(i)
 		} else {
 			_type = AND
 			iCap = leaf + or
-			if noCheck {
+			if relaxed {
 				oCap = or
 			} else {
 				oCap = 1
 			}
 			desc = fmt.Sprintf("r%v", i-leaf-and-1)
+			inRequiredAnd.Add(i)
+			outRequiredAnd.Add(i)
 		}
 		V[i] = &CNode{
 			Id:   i,
@@ -72,82 +88,112 @@ func constructGraph(leaf, and, or, edge int, cycle, noCheck bool, seed int64) {
 		V[i].Pred.Add(i)
 	}
 
-	// Stage 1: priority matches
-	// Nodes are connected such that a minimal, valid attack graph is generated that uses all the nodes
-	// To do so, we create a random permutation of numbers for PF, AND, and OR nodes
-	// Then we simply match them from top to bottom
-	// First match inbound edges from PF/OR to AND
-	priorityInSrc := rnd.Perm(leaf + or - 1) // skip goal node
-	priorityInDst := rnd.Perm(and)
+	total := or + leaf + and
+	andPadding := 1 + leaf + or
 
-	// Preconditions guarantee that the number of AND is geq than then number of OR
-	// However this may not hold in case the check is turned off
-	// Match priority src to priority dst
-	minIn := min(and, leaf+or-1)
-	for i := 0; i < minIn; i++ {
-		// add an edge from src[i] to dst[i]
-		srcId := priorityInSrc[i] + 2
-		dstId := priorityInDst[i] + 1 + leaf + or
-		addEdge(V[srcId], V[dstId], cycle)
+	// Process the lists (i.e. make connections)
+	// Required AND -> OR edges
+	it := outRequiredAnd.Iterator()
+	for it.Next() {
+		andNodeId := it.Value()
+		var orNodeId int
+		if inRequiredOr.Size() > 0 {
+			orNodeIdx := rnd.Intn(inRequiredOr.Size())
+			orNodeId, _ = inRequiredOr.Get(orNodeIdx)
+			inRequiredOr.Remove(orNodeIdx)
+		} else {
+			orNodeId = rnd.Intn(or) + 1
+		}
+
+		// Impossible for cycles to form at this stage, no cycle check necessary
+		addEdge(V[andNodeId], V[orNodeId], cycleOk)
 		edge -= 1
 	}
-	// Match the remaining
-	if minIn == and {
-		for i := len(priorityInDst); i < len(priorityInSrc); i++ {
-			srcId := priorityInSrc[i] + 2
-			dstId := rnd.Intn(and) + 1 + leaf + or
-			addEdge(V[srcId], V[dstId], cycle)
-			edge -= 1
-		}
-	} else {
-		for i := len(priorityInSrc); i < len(priorityInDst); i++ {
-			srcId := rnd.Intn(leaf+or-1) + 2
-			dstId := priorityInDst[i] + 1 + leaf + or
-			addEdge(V[srcId], V[dstId], cycle)
-			edge -= 1
-		}
-	}
+	// Process residual OR nodes
+	it = inRequiredOr.Iterator()
+	for it.Next() {
+		orNodeId := it.Value()
+		andNodeId := rnd.Intn(and) + andPadding
 
-	// Now match outbound edges from AND to OR
-	priorityOutSrc := rnd.Perm(and)
-	priorityOutDst := rnd.Perm(or)
-
-	minOut := min(and, or)
-	for i := 0; i < minOut; i++ {
-		srcId := priorityOutSrc[i] + 1 + leaf + or
-		dstId := priorityOutDst[i] + 1
-		addEdge(V[srcId], V[dstId], cycle)
+		addEdge(V[andNodeId], V[orNodeId], cycleOk)
 		edge -= 1
 	}
-	// Match the remaining
-	if minOut == and {
-		for i := len(priorityOutSrc); i < len(priorityOutDst); i++ {
-			srcId := rnd.Intn(and) + leaf + or + 1
-			dstId := priorityOutDst[i] + 1
-			addEdge(V[srcId], V[dstId], cycle)
-			edge -= 1
+
+	// We are done with required AND -> OR edges now.
+	// Required LEAF/OR -> AND edges
+	it = outRequiredOr.Iterator()
+	for it.Next() {
+		orNodeId := it.Value()
+		var andNodeId, andNodeIdx int
+
+	pickAnother:
+		if inRequiredAnd.Size() > 0 {
+			andNodeIdx = rnd.Intn(inRequiredAnd.Size())
+			andNodeId, _ = inRequiredAnd.Get(andNodeIdx)
+		} else {
+			andNodeId = rnd.Intn(and) + andPadding
 		}
-	} else {
-		for i := len(priorityOutDst); i < len(priorityOutSrc); i++ {
-			srcId := priorityOutSrc[i] + leaf + or + 1
-			dstId := rnd.Intn(or) + 1
-			addEdge(V[srcId], V[dstId], cycle)
+
+		// Cycle is possible at this time
+		if !addEdge(V[orNodeId], V[andNodeId], cycleOk) {
+			goto pickAnother
+		} else {
+			edge -= 1
+			inRequiredAnd.Remove(andNodeIdx)
+		}
+	}
+
+	// Process residual AND nodes
+	it = inRequiredAnd.Iterator()
+	for it.Next() {
+		andNodeId := it.Value()
+		// Skip the goal node
+	pickAnother2:
+		orNodeId := rnd.Intn(or+leaf-1) + 2
+
+		if !addEdge(V[orNodeId], V[andNodeId], cycleOk) {
+			goto pickAnother2
+		} else {
 			edge -= 1
 		}
 	}
 
-	// Stage 2: match the remaining edge quota randomly
-	for ; edge > 0; edge-- {
-
+	// All required edges are satisfied, proceed to generate random edges for remaining edge quota
+	attempts := 1
+	for edge > 0 {
+		if attempts > 100 {
+			log.Println("WARN: edge generation seems to be stuck, consider reducing the edge parameter!")
+		}
+		// Exclude the goal node
+		src := rnd.Intn(total-1) + 2
+		// Determine the correct dst type for the given src
+		var dst int
+		if V[src].Type == OR || V[src].Type == LEAF {
+			dst = rnd.Intn(and) + andPadding
+		} else {
+			dst = rnd.Intn(or) + 1
+		}
+		if addEdge(V[src], V[dst], cycleOk) {
+			// Decrement edge count only if the add was successful; otherwise retry adding
+			edge--
+		} else {
+			attempts += 1
+		}
 	}
 
+	return &V
 }
 
-func addEdge(src, dst *CNode, cycle bool) bool {
+func addEdge(src, dst *CNode, cycleOk bool) bool {
 	// check for cycles (a cycle is found when the dst's predecessors are a subset of src's predecessor)
-	if !cycle && src.Pred.Contains(dst.Pred.Values()...) {
+	if !cycleOk && src.Pred.Contains(dst.Pred.Values()...) {
 		return false
 	}
+	// do not allow for duplicate edges in any case
+	if src.Adj.Contains(dst.Id) {
+		return false
+	}
+
 	src.Adj.Add(dst.Id)
 	dst.Pred.Union(&src.Pred)
 	src.OCap -= 1
