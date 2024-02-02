@@ -77,13 +77,6 @@ func main() {
 				DefaultText: "false",
 			},
 			&cli.BoolFlag{
-				Name:        "graph",
-				Usage:       "generate a pdf rendition of the attack graph",
-				Aliases:     []string{"g"},
-				Value:       false,
-				DefaultText: "false",
-			},
-			&cli.BoolFlag{
 				Name:        "relaxed",
 				Usage:       "relax the constraint so that AND node can have multiple outgoing edges",
 				Value:       false,
@@ -110,6 +103,24 @@ func main() {
 			if edgeNum < minEdge || edgeNum > maxEdge {
 				return fmt.Errorf("flag edge out of bound for current input, valid range [%v-%v], current %v",
 					minEdge, maxEdge, edgeNum)
+			}
+
+			var cycleOk bool
+			if ctx.Bool("cycle") {
+				cycleOk = true
+			} else {
+				cycleOk = false
+			}
+			seed := ctx.Int64("seed")
+			outDir := ctx.String("outdir")
+			generateGraph := ctx.Bool("graph")
+			relaxed := ctx.Bool("relaxed")
+
+			V := constructGraph(leaf, and, or, edgeNum, cycleOk, relaxed, seed)
+
+			graphToCsv(V, outDir)
+			if generateGraph {
+				csvToPdf(fmt.Sprintf("%s//ARCS.CSV", outDir), fmt.Sprintf("%s//VERTICES.CSV", outDir))
 			}
 			return nil
 		},
