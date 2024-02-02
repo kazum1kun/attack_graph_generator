@@ -55,14 +55,14 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 			_type = OR
 			iCap = and
 			oCap = (or - 1) * and
-			desc = fmt.Sprintf("d%v", i-1)
+			desc = fmt.Sprintf("d%v", i)
 			inRequiredOr.Add(i)
 			outRequiredOr.Add(i)
 		} else if i <= or+leaf {
 			_type = LEAF
 			iCap = 0
 			oCap = and
-			desc = fmt.Sprintf("p%v", i-leaf-1)
+			desc = fmt.Sprintf("p%v", i-or)
 			outRequiredOr.Add(i)
 		} else {
 			_type = AND
@@ -72,7 +72,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 			} else {
 				oCap = 1
 			}
-			desc = fmt.Sprintf("r%v", i-leaf-or-1)
+			desc = fmt.Sprintf("r%v", i-leaf-or)
 			inRequiredAnd.Add(i)
 			outRequiredAnd.Add(i)
 		}
@@ -195,7 +195,7 @@ func addEdge(src, dst *CNode, cycleOk bool) bool {
 	}
 
 	src.Adj.Add(dst.Id)
-	dst.Pred.Union(&src.Pred)
+	dst.Pred = *dst.Pred.Union(&src.Pred)
 	src.OCap -= 1
 	dst.ICap -= 1
 	return true
