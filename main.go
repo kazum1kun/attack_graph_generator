@@ -16,6 +16,7 @@ func main() {
 				Usage:    "number of OR, PF and AND nodes (in this order)",
 				Aliases:  []string{"n"},
 				Required: true,
+				Category: "GRAPH",
 				Action: func(ctx *cli.Context, input []int) error {
 					haveNeg := false
 					for _, v := range input {
@@ -34,6 +35,7 @@ func main() {
 				Usage:    "number of edges",
 				Aliases:  []string{"e"},
 				Required: true,
+				Category: "GRAPH",
 				Action: func(ctx *cli.Context, i int) error {
 					if i <= 0 {
 						return fmt.Errorf("flag edge must be positive")
@@ -47,6 +49,7 @@ func main() {
 				Aliases:     []string{"c"},
 				Value:       false,
 				DefaultText: "false",
+				Category:    "GENERATION",
 			},
 			&cli.Int64Flag{
 				Name:        "seed",
@@ -54,6 +57,7 @@ func main() {
 				Aliases:     []string{"s"},
 				Value:       time.Now().UnixNano(),
 				DefaultText: "current Unix epoch in seconds",
+				Category:    "GENERATION",
 			},
 			&cli.StringFlag{
 				Name:        "outdir",
@@ -61,6 +65,7 @@ func main() {
 				Value:       ".",
 				Aliases:     []string{"o"},
 				DefaultText: "current directory",
+				Category:    "OUTPUT",
 				Action: func(ctx *cli.Context, s string) error {
 					_, err := os.Stat("s")
 					if os.IsNotExist(err) {
@@ -75,12 +80,14 @@ func main() {
 				Aliases:     []string{"g"},
 				Value:       false,
 				DefaultText: "false",
+				Category:    "OUTPUT",
 			},
 			&cli.BoolFlag{
 				Name:        "relaxed",
 				Usage:       "relax the constraint so that AND node can have multiple outgoing edges",
 				Value:       false,
 				DefaultText: "false",
+				Category:    "GENERATION",
 			},
 		},
 		Action: func(ctx *cli.Context) error {
@@ -120,7 +127,7 @@ func main() {
 
 			graphToCsv(V, outDir)
 			if generateGraph {
-				csvToPdf(fmt.Sprintf("%s//ARCS.CSV", outDir), fmt.Sprintf("%s//VERTICES.CSV", outDir))
+				csvToPdf(fmt.Sprintf("%s\\ARCS.CSV", outDir), fmt.Sprintf("%s\\VERTICES.CSV", outDir))
 			}
 			return nil
 		},

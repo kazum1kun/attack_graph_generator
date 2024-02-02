@@ -17,20 +17,23 @@ func graphToCsv(V *[]*CNode, outDir string) {
 		log.Panicf("Error creating file in %s\n", outDir)
 	}
 	for _, node := range *V {
+		if node == nil {
+			continue
+		}
 		var endNum int
 		if node.Type == LEAF {
 			endNum = 1
 		} else {
 			endNum = 0
 		}
-		_, err := vertFile.WriteString(fmt.Sprintf("%d,\"%s\",\"%s\",%d",
+		_, err := vertFile.WriteString(fmt.Sprintf("%d,\"%s\",\"%s\",%d\n",
 			node.Id, node.Desc, node.Type, endNum))
 		if err != nil {
 			log.Panicln("Error writing to VERTEX.CSV file")
 		}
 
 		for _, neighbor := range node.Adj.Values() {
-			_, err := arcFile.WriteString(fmt.Sprintf("%d,%d,-1", neighbor, node.Id))
+			_, err := arcFile.WriteString(fmt.Sprintf("%d,%d,-1\n", neighbor, node.Id))
 			if err != nil {
 				log.Panicln("Error writing to ARCS.CSV file")
 			}

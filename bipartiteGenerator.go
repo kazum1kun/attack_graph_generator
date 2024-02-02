@@ -55,14 +55,14 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 			_type = OR
 			iCap = and
 			oCap = (or - 1) * and
-			desc = fmt.Sprintf("d%v", i-leaf-1)
+			desc = fmt.Sprintf("d%v", i-1)
 			inRequiredOr.Add(i)
 			outRequiredOr.Add(i)
 		} else if i <= or+leaf {
 			_type = LEAF
 			iCap = 0
 			oCap = and
-			desc = fmt.Sprintf("p%v", i-1)
+			desc = fmt.Sprintf("p%v", i-leaf-1)
 			outRequiredOr.Add(i)
 		} else {
 			_type = AND
@@ -72,7 +72,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 			} else {
 				oCap = 1
 			}
-			desc = fmt.Sprintf("r%v", i-leaf-and-1)
+			desc = fmt.Sprintf("r%v", i-leaf-or-1)
 			inRequiredAnd.Add(i)
 			outRequiredAnd.Add(i)
 		}
@@ -80,10 +80,10 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 			Id:   i,
 			Type: _type,
 			Desc: desc,
-			Pred: set.Set[int]{},
+			Pred: *set.New[int](),
 			ICap: iCap,
 			OCap: oCap,
-			Adj:  set.Set[int]{},
+			Adj:  *set.New[int](),
 		}
 		V[i].Pred.Add(i)
 	}
@@ -185,7 +185,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 }
 
 func addEdge(src, dst *CNode, cycleOk bool) bool {
-	// check for cycles (a cycle is found when the dst's predecessors are a subset of src's predecessor)
+	// check for cycles (a cycle is found when the dst predecessors are a subset of src predecessor)
 	if !cycleOk && src.Pred.Contains(dst.Pred.Values()...) {
 		return false
 	}
