@@ -5,30 +5,24 @@ import (
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
 func main() {
 	app := &cli.App{
+		Name:      "AGG",
+		Usage:     "Mulval-compatible attack graph generator",
+		UsageText: "attack_graph_generator command [command options]",
+		Version:   "0.1.1",
 		Flags: []cli.Flag{
-			&cli.IntSliceFlag{
+			&cli.StringFlag{
 				Name:     "node",
 				Usage:    "number of OR, PF and AND nodes (in this order)",
 				Aliases:  []string{"n"},
 				Required: true,
 				Category: "GRAPH",
-				Action: func(ctx *cli.Context, input []int) error {
-					haveNeg := false
-					for _, v := range input {
-						if v <= 0 {
-							haveNeg = false
-						}
-					}
-					if len(input) != 3 || haveNeg {
-						return fmt.Errorf("flag node should contain exactly 3 positive integers")
-					}
-					return nil
-				},
 			},
 			&cli.IntFlag{
 				Name:     "edge",
@@ -91,10 +85,31 @@ func main() {
 			},
 		},
 		Action: func(ctx *cli.Context) error {
-			nodeNum := ctx.IntSlice("node")
-			or := nodeNum[0]
-			leaf := nodeNum[1]
-			and := nodeNum[2]
+			node := ctx.String("node")
+			tokens := strings.Split(node, " ")
+			hasError := false
+			if len(tokens) != 3 {
+				hasError = true
+			}
+			or, err := strconv.Atoi(tokens[0])
+			if err != nil {
+				hasError = true
+			}
+			leaf, err := strconv.Atoi(tokens[1])
+			if err != nil {
+				hasError = true
+			}
+			and, err := strconv.Atoi(tokens[2])
+			if err != nil {
+				hasError = true
+			}
+			if min(min(or, leaf), and) < 0 {
+				hasError = true
+			}
+			if hasError {
+				return fmt.Errorf("flag node should contain exactly 3 positive integers")
+			}
+
 			edgeNum := ctx.Int("edge")
 
 			minEdge := (leaf + 2*and + or) / 2
