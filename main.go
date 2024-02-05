@@ -142,7 +142,7 @@ func main() {
 
 			graphToCsv(V, outDir)
 			if generateGraph {
-				csvToPdf(fmt.Sprintf("%s\\ARCS.CSV", outDir), fmt.Sprintf("%s\\VERTICES.CSV", outDir))
+				csvToPdf(fmt.Sprintf("%s/ARCS.CSV", outDir), fmt.Sprintf("%s/VERTICES.CSV", outDir))
 			}
 			return nil
 		},

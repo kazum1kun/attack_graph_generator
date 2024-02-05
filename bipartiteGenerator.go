@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	al "github.com/ugurcsen/gods-generic/lists/arraylist"
+	queue "github.com/ugurcsen/gods-generic/queues/linkedlistqueue"
 	set "github.com/ugurcsen/gods-generic/sets/hashset"
 	"log"
 	"math/rand"
@@ -106,7 +107,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 		}
 
 		// Impossible for cycles to form at this stage, no cycle check necessary
-		addEdge(V[andNodeId], V[orNodeId], cycleOk)
+		addEdge(V[andNodeId], V[orNodeId], cycleOk, &V)
 		edge -= 1
 	}
 	// Process residual OR nodes
@@ -115,7 +116,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 		orNodeId := it.Value()
 		andNodeId := rnd.Intn(and) + andPadding
 
-		addEdge(V[andNodeId], V[orNodeId], cycleOk)
+		addEdge(V[andNodeId], V[orNodeId], cycleOk, &V)
 		edge -= 1
 	}
 
@@ -135,7 +136,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 		}
 
 		// Cycle is possible at this time
-		if !addEdge(V[orNodeId], V[andNodeId], cycleOk) {
+		if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
 			goto pickAnother
 		} else {
 			edge -= 1
@@ -151,7 +152,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 	pickAnother2:
 		orNodeId := rnd.Intn(or+leaf-1) + 2
 
-		if !addEdge(V[orNodeId], V[andNodeId], cycleOk) {
+		if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
 			goto pickAnother2
 		} else {
 			edge -= 1
@@ -173,7 +174,12 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 		} else {
 			dst = rnd.Intn(or) + 1
 		}
-		if addEdge(V[src], V[dst], cycleOk) {
+		// Check the capacities
+		if V[src].OCap < 1 || V[dst].ICap < 1 {
+			continue
+		}
+
+		if addEdge(V[src], V[dst], cycleOk, &V) {
 			// Decrement edge count only if the add was successful; otherwise retry adding
 			edge--
 		} else {
@@ -184,7 +190,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 	return &V
 }
 
-func addEdge(src, dst *CNode, cycleOk bool) bool {
+func addEdge(src, dst *CNode, cycleOk bool, V *[]*CNode) bool {
 	// check for cycles (a cycle is found when the dst predecessors are a subset of src predecessor)
 	if !cycleOk && src.Pred.Contains(dst.Pred.Values()...) {
 		return false
@@ -195,7 +201,18 @@ func addEdge(src, dst *CNode, cycleOk bool) bool {
 	}
 
 	src.Adj.Add(dst.Id)
-	dst.Pred = *dst.Pred.Union(&src.Pred)
+
+	// Update the Pred info in the subtree rooted at dst
+	q := queue.New[*CNode]()
+	q.Enqueue(dst)
+	for !q.Empty() {
+		node, _ := q.Dequeue()
+		node.Pred = *node.Pred.Union(&src.Pred)
+		for _, adjNode := range node.Adj.Values() {
+			q.Enqueue((*V)[adjNode])
+		}
+	}
+
 	src.OCap -= 1
 	dst.ICap -= 1
 	return true
