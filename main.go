@@ -14,7 +14,7 @@ func main() {
 	app := &cli.App{
 		Name:      "AGG",
 		Usage:     "Mulval-compatible attack graph generator",
-		UsageText: "attack_graph_generator command [command options]",
+		UsageText: "agg command [command options]",
 		Version:   "0.2.0",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -50,7 +50,7 @@ func main() {
 				Usage:       "random seed",
 				Aliases:     []string{"s"},
 				Value:       time.Now().UnixNano(),
-				DefaultText: "current Unix epoch in seconds",
+				DefaultText: "current Unix epoch in nanoseconds",
 				Category:    "GENERATION",
 			},
 			&cli.StringFlag{
@@ -70,7 +70,7 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:        "graph",
-				Usage:       "generate a pdf rendition of the attack graph",
+				Usage:       "generate a graphical rendition of the attack graph",
 				Aliases:     []string{"g"},
 				Value:       false,
 				DefaultText: "false",
@@ -85,7 +85,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:        "vertsed",
-				Usage:       "sed definition files to process VERTICES.CSV",
+				Usage:       "sed `FILE` to be used to process VERTICES.CSV",
 				Value:       "./misc/VERTICES_no_metric.sed",
 				Aliases:     []string{"vs"},
 				DefaultText: "./misc/VERTICES_no_metric.sed",
@@ -93,7 +93,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:        "arcsed",
-				Usage:       "sed definition files to process ARCS.CSV",
+				Usage:       "sed `FILE` to be used to process ARCS.CSV",
 				Value:       "./misc/ARCS_noLabel.sed",
 				Aliases:     []string{"as"},
 				DefaultText: "./misc/ARCS_noLabel.sed",
