@@ -3,45 +3,57 @@ package main
 import (
 	"fmt"
 	"github.com/goccy/go-graphviz"
+	"github.com/rwtodd/Go.Sed/sed"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 )
 
 func csvToPdf(arcFile, vertFile string) {
 	baseDir := filepath.Dir(arcFile)
 
 	// Convert CSV files to DOT files
+	// Create output DOT file
 	outFile, err := os.Create(baseDir + "/AttackGraph.dot")
 	if err != nil {
 		log.Fatalf("Error creating DOT file: %v", err)
 	}
-	_, _ = outFile.WriteString("digraph G {")
+	_, _ = outFile.WriteString("digraph G {\n")
 
-	if runtime.GOOS == "windows" {
-		c1 := fmt.Sprintf(".\\bin\\sed.exe -f .\\misc\\VERTICES_no_metric.sed %s >> %s\\AttackGraph.dot", vertFile, baseDir)
-		c2 := fmt.Sprintf(".\\bin\\sed.exe -f .\\misc\\ARCS_noLabel.sed %s >> %s\\AttackGraph.dot", arcFile, baseDir)
-		cmd1 := exec.Command("pwsh.exe", "-c", c1)
-		cmd2 := exec.Command("pwsh.exe", "-c", c2)
-		err = cmd1.Run()
-		err = cmd2.Run()
-		if err != nil {
-			log.Fatalf("Error converting CSV to DOT file: %v", err)
-		}
-	} else {
-		cmd1 := exec.Command("sed", "-f", "./misc/VERTICES_no_metric.sed", vertFile)
-		out, err := cmd1.Output()
-		_, _ = outFile.Write(out)
-		if err != nil {
-			log.Fatalf("Error converting CSV to DOT file: %v", err)
-		}
-		cmd2 := exec.Command("sed", "-f", "./misc/ARCS_noLabel.sed", arcFile)
-		out, _ = cmd2.Output()
-		_, _ = outFile.Write(out)
-
+	// Convert vertices
+	vertSedFile, err := os.Open("./misc/VERTICES_no_metric.sed")
+	if err != nil {
+		log.Fatalln("Error opening vertices sed definition files")
 	}
+	engine, err := sed.New(vertSedFile)
+	if err != nil {
+		log.Fatalln("Error parsing provided vertices sed files")
+	}
+	vertString, _ := os.ReadFile(vertFile)
+	runString, err := engine.RunString(string(vertString))
+	if err != nil {
+		log.Fatalln("Error parsing CSV to .dot files")
+	}
+	_, _ = outFile.WriteString(runString)
+	if err != nil {
+		log.Fatalf("Error converting CSV to DOT file: %v", err)
+	}
+
+	// Convert edges
+	arcSedFile, err := os.Open("./misc/ARCS_noLabel.sed")
+	if err != nil {
+		log.Fatalln("Error opening arcs sed definition files")
+	}
+	engine, err = sed.New(arcSedFile)
+	if err != nil {
+		log.Fatalln("Error parsing provided arcs sed files")
+	}
+	arcString, _ := os.ReadFile(arcFile)
+	runString, err = engine.RunString(string(arcString))
+	if err != nil {
+		log.Fatalln("Error parsing CSV to .dot files")
+	}
+	_, _ = outFile.WriteString(runString)
 
 	_, _ = outFile.WriteString("}")
 	_ = outFile.Sync()

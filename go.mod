@@ -8,6 +8,8 @@ require github.com/ugurcsen/gods-generic v0.10.4
 
 require github.com/goccy/go-graphviz v0.1.2
 
+require github.com/rwtodd/Go.Sed v0.0.0-20230610052213-ba3e9c186f0a
+
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
