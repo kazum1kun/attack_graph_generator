@@ -127,7 +127,11 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 		orNodeId := it.Value()
 		var andNodeId, andNodeIdx int
 
+		attempts := 1
 	pickAnother:
+		if attempts == 100*total {
+			log.Println("WARN: edge generation seems to be stuck, consider adding more AND nodes or allow cycles")
+		}
 		if inRequiredAnd.Size() > 0 {
 			andNodeIdx = rnd.Intn(inRequiredAnd.Size())
 			andNodeId, _ = inRequiredAnd.Get(andNodeIdx)
@@ -137,6 +141,7 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 
 		// Cycle is possible at this time
 		if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
+			attempts += 1
 			goto pickAnother
 		} else {
 			edge -= 1
@@ -162,8 +167,8 @@ func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) 
 	// All required edges are satisfied, proceed to generate random edges for remaining edge quota
 	attempts := 1
 	for edge > 0 {
-		if attempts > 100 {
-			log.Println("WARN: edge generation seems to be stuck, consider reducing the edge parameter!")
+		if attempts == 100*total {
+			log.Println("WARN: edge generation seems to be stuck, consider reducing the edge parameter")
 		}
 		// Exclude the goal node
 		src := rnd.Intn(total-1) + 2
@@ -203,13 +208,16 @@ func addEdge(src, dst *CNode, cycleOk bool, V *[]*CNode) bool {
 	src.Adj.Add(dst.Id)
 
 	// Update the Pred info in the subtree rooted at dst
-	q := queue.New[*CNode]()
-	q.Enqueue(dst)
-	for !q.Empty() {
-		node, _ := q.Dequeue()
-		node.Pred = *node.Pred.Union(&src.Pred)
-		for _, adjNode := range node.Adj.Values() {
-			q.Enqueue((*V)[adjNode])
+	// Disable this step for cycles (since they will lead to infinite loops)
+	if !cycleOk {
+		q := queue.New[*CNode]()
+		q.Enqueue(dst)
+		for !q.Empty() {
+			node, _ := q.Dequeue()
+			node.Pred = *node.Pred.Union(&src.Pred)
+			for _, adjNode := range node.Adj.Values() {
+				q.Enqueue((*V)[adjNode])
+			}
 		}
 	}
 

@@ -15,7 +15,7 @@ func main() {
 		Name:      "AGG",
 		Usage:     "Mulval-compatible attack graph generator",
 		UsageText: "agg command [command options]",
-		Version:   "0.2.0",
+		Version:   "0.2.1",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "node",
@@ -119,7 +119,7 @@ func main() {
 			if err != nil {
 				hasError = true
 			}
-			if min(min(or, leaf), and) < 0 {
+			if min(min(or, leaf), and) <= 0 {
 				hasError = true
 			}
 			if hasError {

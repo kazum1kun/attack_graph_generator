@@ -20,7 +20,7 @@ USAGE:
    agg command [command options]
 
 VERSION:
-   0.2.0
+   0.2.1
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
