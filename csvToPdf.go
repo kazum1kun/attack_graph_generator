@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func csvToPdf(arcFile, vertFile string) {
+func csvToPdf(arcFile, vertFile, arcSed, vertSed string) {
 	baseDir := filepath.Dir(arcFile)
 
 	// Convert CSV files to DOT files
@@ -21,7 +21,7 @@ func csvToPdf(arcFile, vertFile string) {
 	_, _ = outFile.WriteString("digraph G {\n")
 
 	// Convert vertices
-	vertSedFile, err := os.Open("./misc/VERTICES_no_metric.sed")
+	vertSedFile, err := os.Open(vertSed)
 	if err != nil {
 		log.Fatalln("Error opening vertices sed definition files")
 	}
@@ -40,7 +40,7 @@ func csvToPdf(arcFile, vertFile string) {
 	}
 
 	// Convert edges
-	arcSedFile, err := os.Open("./misc/ARCS_noLabel.sed")
+	arcSedFile, err := os.Open(arcSed)
 	if err != nil {
 		log.Fatalln("Error opening arcs sed definition files")
 	}

@@ -15,7 +15,7 @@ func main() {
 		Name:      "AGG",
 		Usage:     "Mulval-compatible attack graph generator",
 		UsageText: "attack_graph_generator command [command options]",
-		Version:   "0.1.1",
+		Version:   "0.2.0",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "node",
@@ -83,6 +83,22 @@ func main() {
 				DefaultText: "false",
 				Category:    "GENERATION",
 			},
+			&cli.StringFlag{
+				Name:        "vertsed",
+				Usage:       "sed definition files to process VERTICES.CSV",
+				Value:       "./misc/VERTICES_no_metric.sed",
+				Aliases:     []string{"vs"},
+				DefaultText: "./misc/VERTICES_no_metric.sed",
+				Category:    "OUTPUT",
+			},
+			&cli.StringFlag{
+				Name:        "arcsed",
+				Usage:       "sed definition files to process ARCS.CSV",
+				Value:       "./misc/ARCS_noLabel.sed",
+				Aliases:     []string{"as"},
+				DefaultText: "./misc/ARCS_noLabel.sed",
+				Category:    "OUTPUT",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			node := ctx.String("node")
@@ -140,9 +156,12 @@ func main() {
 
 			V := constructGraph(leaf, and, or, edgeNum, cycleOk, relaxed, seed)
 
+			arcSed := ctx.String("arcsed")
+			vertSed := ctx.String("vertsed")
 			graphToCsv(V, outDir)
 			if generateGraph {
-				csvToPdf(fmt.Sprintf("%s/ARCS.CSV", outDir), fmt.Sprintf("%s/VERTICES.CSV", outDir))
+				csvToPdf(fmt.Sprintf("%s/ARCS.CSV", outDir), fmt.Sprintf("%s/VERTICES.CSV", outDir),
+					arcSed, vertSed)
 			}
 			return nil
 		},
