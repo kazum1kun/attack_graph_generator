@@ -1,4 +1,4 @@
-package main
+package generator
 
 import (
 	"fmt"
@@ -9,26 +9,7 @@ import (
 	"math/rand"
 )
 
-type NodeType string
-
-const (
-	LEAF NodeType = "LEAF"
-	AND           = "AND"
-	OR            = "OR"
-)
-
-type CNode struct {
-	Id   int
-	Type NodeType
-	Desc string
-	Pred set.Set[int]
-	ICap int
-	OCap int
-	Adj  set.Set[int]
-}
-
-func constructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, seed int64) *[]*CNode {
-	rnd := rand.New(rand.NewSource(seed))
+func ConstructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Rand) *[]*CNode {
 	// We first construct 4 lists:
 	// inRequiredOr is the list of OR that needs an inbound edge
 	inRequiredOr := al.New[int]()

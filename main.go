@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/kazum1kun/attack_graph_generator/generator"
+	"github.com/kazum1kun/attack_graph_generator/utils"
 	"github.com/urfave/cli/v2"
 	"log"
+	"math"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -99,6 +103,14 @@ func main() {
 				DefaultText: "./misc/ARCS_noLabel.sed",
 				Category:    "OUTPUT",
 			},
+			&cli.BoolFlag{
+				Name:        "randw",
+				Usage:       "add random weights to the edges",
+				Value:       false,
+				Aliases:     []string{"rw"},
+				DefaultText: "false",
+				Category:    "OUTPUT",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			node := ctx.String("node")
@@ -153,14 +165,20 @@ func main() {
 			outDir := ctx.String("outdir")
 			generateGraph := ctx.Bool("graph")
 			relaxed := ctx.Bool("relaxed")
+			randW := ctx.Bool("randw")
 
-			V := constructGraph(leaf, and, or, edgeNum, cycleOk, relaxed, seed)
+			rnd := rand.New(rand.NewSource(seed))
+			V := generator.ConstructGraph(leaf, and, or, edgeNum, cycleOk, relaxed, rnd)
+
+			if randW {
+				utils.SetGaussianParams(math.Log2(float64(edgeNum)), 0.2, 0.01)
+			}
 
 			arcSed := ctx.String("arcsed")
 			vertSed := ctx.String("vertsed")
-			graphToCsv(V, outDir)
+			utils.GraphToCsv(V, outDir, rnd)
 			if generateGraph {
-				csvToPdf(fmt.Sprintf("%s/ARCS.CSV", outDir), fmt.Sprintf("%s/VERTICES.CSV", outDir),
+				utils.CsvToPdf(fmt.Sprintf("%s/ARCS.CSV", outDir), fmt.Sprintf("%s/VERTICES.CSV", outDir),
 					arcSed, vertSed)
 			}
 			return nil
