@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func csvToPdf(arcFile, vertFile, arcSed, vertSed string) {
+func CsvToPdf(arcFile, vertFile, arcSed, vertSed string) {
 	baseDir := filepath.Dir(arcFile)
 
 	// Convert CSV files to DOT files
