@@ -176,7 +176,13 @@ func main() {
 
 			arcSed := ctx.String("arcsed")
 			vertSed := ctx.String("vertsed")
-			utils.GraphToCsv(V, outDir, rnd)
+
+			if randW {
+				utils.GraphToCsv(V, outDir, rnd)
+			} else {
+				utils.GraphToCsv(V, outDir, nil)
+			}
+
 			if generateGraph {
 				utils.CsvToPdf(fmt.Sprintf("%s/ARCS.CSV", outDir), fmt.Sprintf("%s/VERTICES.CSV", outDir),
 					arcSed, vertSed)

@@ -2,13 +2,15 @@ package generator
 
 import (
 	"fmt"
+	wr "github.com/mroth/weightedrand/v2"
 	al "github.com/ugurcsen/gods-generic/lists/arraylist"
 	queue "github.com/ugurcsen/gods-generic/queues/linkedlistqueue"
 	set "github.com/ugurcsen/gods-generic/sets/hashset"
-	"log"
+	"math"
 	"math/rand"
 )
 
+//goland:noinspection GoDeprecation
 func ConstructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Rand) *[]*CNode {
 	// We first construct 4 lists:
 	// inRequiredOr is the list of OR that needs an inbound edge
@@ -20,8 +22,11 @@ func ConstructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Ra
 	// outRequiredAnd is the list of AND that needs an outbound edge
 	outRequiredAnd := al.New[int]()
 
+	total := or + leaf + and
+	andPadding := 1 + leaf + or
+
 	// Initialize CNodes for all nodes
-	V := make([]*CNode, leaf+and+or+1)
+	V := make([]*CNode, total+1)
 	for i := 1; i <= leaf+and+or; i++ {
 		var _type NodeType
 		var iCap, oCap int
@@ -36,7 +41,7 @@ func ConstructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Ra
 		} else if i <= or {
 			_type = OR
 			iCap = and
-			oCap = (or - 1) * and
+			oCap = and
 			desc = fmt.Sprintf("d%v", i)
 			inRequiredOr.Add(i)
 			outRequiredOr.Add(i)
@@ -70,106 +75,110 @@ func ConstructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Ra
 		V[i].Pred.Add(i)
 	}
 
-	total := or + leaf + and
-	andPadding := 1 + leaf + or
-
 	// Process the lists (i.e. make connections)
 	// Required AND -> OR edges
-	it := outRequiredAnd.Iterator()
-	for it.Next() {
-		andNodeId := it.Value()
-		var orNodeId int
-		if inRequiredOr.Size() > 0 {
-			orNodeIdx := rnd.Intn(inRequiredOr.Size())
-			orNodeId, _ = inRequiredOr.Get(orNodeIdx)
-			inRequiredOr.Remove(orNodeIdx)
-		} else {
-			orNodeId = rnd.Intn(or) + 1
-		}
+	// Shuffle both "outRequiredAnd" and "inRequiredOr" lists, then we match them index-wise (similar to Python `zip`)
+	// Note that, because rand.Perm only makes a sequence with range [0, n), we need to offset the numbers
+	outRequiredAndPerm := rnd.Perm(and)
+	inRequiredOrPerm := rnd.Perm(or)
 
-		// Impossible for cycles to form at this stage, no cycle check necessary
+	var andNodeId, orNodeId int
+	for i := 0; i < min(or, and); i++ {
+		andNodeId = outRequiredAndPerm[i] + andPadding
+		orNodeId = inRequiredOrPerm[i] + 1
 		addEdge(V[andNodeId], V[orNodeId], cycleOk, &V)
 		edge -= 1
 	}
-	// Process residual OR nodes
-	it = inRequiredOr.Iterator()
-	for it.Next() {
-		orNodeId := it.Value()
-		andNodeId := rnd.Intn(and) + andPadding
-
-		addEdge(V[andNodeId], V[orNodeId], cycleOk, &V)
-		edge -= 1
-	}
-
-	// We are done with required AND -> OR edges now.
-	// Required LEAF/OR -> AND edges
-	it = outRequiredOr.Iterator()
-	for it.Next() {
-		orNodeId := it.Value()
-		var andNodeId, andNodeIdx int
-
-		attempts := 1
-	pickAnother:
-		if attempts == 100*total {
-			log.Println("WARN: edge generation seems to be stuck, consider adding more AND nodes or allow cycles")
-		}
-		if inRequiredAnd.Size() > 0 {
-			andNodeIdx = rnd.Intn(inRequiredAnd.Size())
-			andNodeId, _ = inRequiredAnd.Get(andNodeIdx)
-		} else {
+	// We run out of AND first, use `and` as our starting index for remaining OR nodes
+	// Then connect a random AND to the OR
+	if and < or {
+		for i := and; i < or; i++ {
+			orNodeId = inRequiredOrPerm[i] + 1
+		reroll1:
 			andNodeId = rnd.Intn(and) + andPadding
-		}
-
-		// Cycle is possible at this time
-		if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
-			attempts += 1
-			goto pickAnother
-		} else {
+			if !addEdge(V[andNodeId], V[orNodeId], cycleOk, &V) {
+				goto reroll1
+			}
 			edge -= 1
-			inRequiredAnd.Remove(andNodeIdx)
 		}
-	}
-
-	// Process residual AND nodes
-	it = inRequiredAnd.Iterator()
-	for it.Next() {
-		andNodeId := it.Value()
-		// Skip the goal node
-	pickAnother2:
-		orNodeId := rnd.Intn(or+leaf-1) + 2
-
-		if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
-			goto pickAnother2
-		} else {
+	} else if or < and {
+		// The opposite situation
+		for i := or; i < and; i++ {
+			andNodeId = outRequiredAndPerm[i] + andPadding
+		reroll2:
+			orNodeId = rnd.Intn(or) + 1
+			if !addEdge(V[andNodeId], V[orNodeId], cycleOk, &V) {
+				goto reroll2
+			}
 			edge -= 1
 		}
 	}
 
-	// All required edges are satisfied, proceed to generate random edges for remaining edge quota
-	attempts := 1
+	// Required LEAF/OR -> AND edges
+	outRequiredOrPerm := rnd.Perm(or + leaf - 1)
+	inRequiredAndPerm := rnd.Perm(and)
+
+	for i := 0; i < min(or+leaf-1, and); i++ {
+		orNodeId = outRequiredOrPerm[i] + 2
+		andNodeId = inRequiredAndPerm[i] + andPadding
+		addEdge(V[orNodeId], V[andNodeId], cycleOk, &V)
+		edge -= 1
+	}
+	// We run out of OR/LEAF first, use `or+leaf-1` as our starting index for remaining AND nodes
+	if or+leaf-1 < and {
+		for i := or + leaf - 1; i < and; i++ {
+			andNodeId = inRequiredAndPerm[i] + andPadding
+		reroll3:
+			orNodeId = rnd.Intn(or+leaf-1) + 2
+			if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
+				goto reroll3
+			}
+			edge -= 1
+		}
+		// The opposite situation
+	} else if and < or+leaf-1 {
+		for i := and; i < or+leaf-1; i++ {
+			orNodeId = outRequiredOrPerm[i] + 2
+		reroll4:
+			andNodeId = rnd.Intn(and) + andPadding
+			if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
+				goto reroll4
+			}
+			edge -= 1
+		}
+	}
+
+	// Initialize a weighted random draw
+	outChooser, inOrChooser, inAndChooser := initRand(&V, and, or, andPadding)
+
+	success := 0.0
+	// Randomly draw from the weighted out/in distributions
 	for edge > 0 {
-		if attempts == 100*total {
-			log.Println("WARN: edge generation seems to be stuck, consider reducing the edge parameter")
-		}
-		// Exclude the goal node
-		src := rnd.Intn(total-1) + 2
-		// Determine the correct dst type for the given src
-		var dst int
-		if V[src].Type == OR || V[src].Type == LEAF {
-			dst = rnd.Intn(and) + andPadding
-		} else {
-			dst = rnd.Intn(or) + 1
-		}
-		// Check the capacities
-		if V[src].OCap < 1 || V[dst].ICap < 1 {
-			continue
+		// Re-populate the chooser with the latest info
+		if success > math.Sqrt(float64(total)) {
+			outChooser, inOrChooser, inAndChooser = initRand(&V, and, or, andPadding)
+			success = 0.0
 		}
 
-		if addEdge(V[src], V[dst], cycleOk, &V) {
-			// Decrement edge count only if the add was successful; otherwise retry adding
-			edge--
+		src := outChooser.PickSource(rnd)
+		if V[src].Type == AND {
+		reroll5:
+			dst := inOrChooser.PickSource(rnd)
+			if addEdge(V[src], V[dst], cycleOk, &V) {
+				success += 1
+				edge -= 1
+			} else {
+				goto reroll5
+			}
 		} else {
-			attempts += 1
+		reroll6:
+			dst := inAndChooser.PickSource(rnd)
+			if addEdge(V[src], V[dst], cycleOk, &V) {
+				success += 1
+				edge -= 1
+			} else {
+				goto reroll6
+			}
 		}
 	}
 
@@ -205,4 +214,28 @@ func addEdge(src, dst *CNode, cycleOk bool, V *[]*CNode) bool {
 	src.OCap -= 1
 	dst.ICap -= 1
 	return true
+}
+
+func initRand(V *[]*CNode, and, or, andPadding int) (*wr.Chooser[int, int], *wr.Chooser[int, int], *wr.Chooser[int, int]) {
+	// Construct weighted avg arrays for outgoing and incoming edges
+	outgoingTemp := make([]wr.Choice[int, int], len(*V))
+	incomingOrTemp := make([]wr.Choice[int, int], or)
+	incomingAndTemp := make([]wr.Choice[int, int], and)
+	for i := 1; i < len(*V); i++ {
+		if (*V)[i].OCap > 0 {
+			outgoingTemp[i-1] = wr.NewChoice(i, (*V)[i].OCap)
+		}
+		if (*V)[i].ICap > 0 {
+			if (*V)[i].Type == OR {
+				incomingOrTemp[i-1] = wr.NewChoice(i, (*V)[i].ICap)
+			} else {
+				incomingAndTemp[i-andPadding] = wr.NewChoice(i, (*V)[i].ICap)
+			}
+		}
+	}
+	outgoingChooser, _ := wr.NewChooser(outgoingTemp...)
+	incomingOrChooser, _ := wr.NewChooser(incomingOrTemp...)
+	incomingAndChooser, _ := wr.NewChooser(incomingAndTemp...)
+
+	return outgoingChooser, incomingOrChooser, incomingAndChooser
 }
