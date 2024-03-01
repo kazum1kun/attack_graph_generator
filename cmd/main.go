@@ -87,6 +87,14 @@ func main() {
 				DefaultText: "false",
 				Category:    "GENERATION",
 			},
+			&cli.BoolFlag{
+				Name:        "altgen",
+				Usage:       "alternative generation method that used a lot more RAM, but converge quicker",
+				Value:       false,
+				Aliases:     []string{"alt"},
+				DefaultText: "false",
+				Category:    "GENERATION",
+			},
 			&cli.StringFlag{
 				Name:        "vertsed",
 				Usage:       "sed `FILE` to be used to process VERTICES.CSV",
@@ -166,9 +174,16 @@ func main() {
 			generateGraph := ctx.Bool("graph")
 			relaxed := ctx.Bool("relaxed")
 			randW := ctx.Bool("randw")
+			alt := ctx.Bool("altgen")
 
 			rnd := rand.New(rand.NewSource(seed))
-			V := generator.ConstructGraph(leaf, and, or, edgeNum, cycleOk, relaxed, rnd)
+
+			var V *[]*generator.CNode
+			if alt {
+				V = generator.ConstructGraphAlt(leaf, and, or, edgeNum, cycleOk, relaxed, rnd)
+			} else {
+				V = generator.ConstructGraph(leaf, and, or, edgeNum, cycleOk, relaxed, rnd)
+			}
 
 			if randW {
 				utils.SetGaussianParams(math.Log2(float64(edgeNum)), 0.2, 0.01)
