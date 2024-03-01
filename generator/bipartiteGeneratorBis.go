@@ -3,9 +3,9 @@ package generator
 import (
 	"fmt"
 	set "github.com/ugurcsen/gods-generic/sets/hashset"
+	hset "github.com/ugurcsen/gods-generic/sets/linkedhashset"
 	"math/rand"
 )
-import "github.com/ugurcsen/gods-generic/maps/hashmap"
 import sll "github.com/ugurcsen/gods-generic/lists/singlylinkedlist"
 
 // ConstructGraphAlt A memory-hungry version of the generator
@@ -146,49 +146,48 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 		}
 	}
 
-	availMap := constructAvailMap(&V, leaf, and, or)
-	for edge > 0 {
-		src := rnd.Intn(availMap.Size())
-		val, ok := availMap.Get(src)
-		if !ok || val.Size() == 0 {
-			continue
+	// First find all nodes with available OCap
+	availSet := hset.New[int]()
+	for i := 1; i <= total; i++ {
+		if V[i].OCap > 0 {
+			availSet.Add(i)
 		}
+	}
 
-		dst := rnd.Intn(val.Size())
+	for edge > 0 {
+		src := rnd.Intn(availSet.Size())
+		var targets *hset.Set[int]
+		if V[src].Type == AND {
+			targets = hset.New[int](makeRange(0, or-1)...)
+		} else {
+			targets = hset.New[int](makeRange(andPadding, total)...)
+		}
+		targets.Remove(V[src].Adj.Values()...)
+
+		dstIdx := rnd.Intn(targets.Size())
+		it := targets.Iterator()
+		for dstIdx > 0 {
+			it.Next()
+			dstIdx -= 1
+		}
+		dst := it.Value()
 
 		if !addEdge(V[src], V[dst], cycleOk, &V) {
 			continue
+		} else {
+			if V[src].OCap < 1 {
+				availSet.Remove(src)
+			}
 		}
-
-		edge -= 1
-		val.Remove(dst)
 	}
 
 	return &V
 }
 
-func constructAvailMap(V *[]*CNode, leaf, and, or int) *hashmap.Map[int, *sll.List[int]] {
-	total := or + leaf + and
-	andPadding := 1 + leaf + or
-
-	availMapping := hashmap.New[int, *sll.List[int]]()
-	for i := 1; i <= total; i++ {
-		list := sll.New[int]()
-		if (*V)[i].Type == AND {
-			for j := 1; j <= or; j++ {
-				if !(*V)[i].Adj.Contains(j) {
-					list.Add(j)
-				}
-			}
-		} else {
-			for j := andPadding; j <= total; j++ {
-				if !(*V)[i].Adj.Contains(j) {
-					list.Add(j)
-				}
-			}
-		}
-		availMapping.Put(i, list)
+func makeRange(min, max int) []int {
+	a := make([]int, max-min+1)
+	for i := range a {
+		a[i] = min + i
 	}
-
-	return availMapping
+	return a
 }
