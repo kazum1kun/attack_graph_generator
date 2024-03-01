@@ -2,24 +2,13 @@ package generator
 
 import (
 	"fmt"
+	dll "github.com/kazum1kun/attack_graph_generator/doublylinkedlist"
 	set "github.com/ugurcsen/gods-generic/sets/hashset"
-	hset "github.com/ugurcsen/gods-generic/sets/linkedhashset"
 	"math/rand"
 )
-import sll "github.com/ugurcsen/gods-generic/lists/singlylinkedlist"
 
 // ConstructGraphAlt A memory-hungry version of the generator
 func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Rand) *[]*CNode {
-	// We first construct 4 lists:
-	// inRequiredOr is the list of OR that needs an inbound edge
-	inRequiredOr := sll.New[int]()
-	// inRequiredAnd is the list of AND that needs an inbound edge
-	inRequiredAnd := sll.New[int]()
-	// outRequiredOr is the list of OR/LEAF that needs an outbound edge
-	outRequiredOr := sll.New[int]()
-	// outRequiredAnd is the list of AND that needs an outbound edge
-	outRequiredAnd := sll.New[int]()
-
 	total := or + leaf + and
 	andPadding := 1 + leaf + or
 
@@ -35,20 +24,16 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 			iCap = and
 			oCap = 0
 			desc = "goal"
-			inRequiredOr.Add(i)
 		} else if i <= or {
 			_type = OR
 			iCap = and
 			oCap = and
 			desc = fmt.Sprintf("d%v", i)
-			inRequiredOr.Add(i)
-			outRequiredOr.Add(i)
 		} else if i <= or+leaf {
 			_type = LEAF
 			iCap = 0
 			oCap = and
 			desc = fmt.Sprintf("p%v", i-or)
-			outRequiredOr.Add(i)
 		} else {
 			_type = AND
 			iCap = leaf + or
@@ -58,8 +43,6 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 				oCap = 1
 			}
 			desc = fmt.Sprintf("r%v", i-leaf-or)
-			inRequiredAnd.Add(i)
-			outRequiredAnd.Add(i)
 		}
 		V[i] = &CNode{
 			Id:   i,
@@ -73,115 +56,47 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 		V[i].Pred.Add(i)
 	}
 
-	// Process the lists (i.e. make connections)
-	// Required AND -> OR edges
-	// Shuffle both "outRequiredAnd" and "inRequiredOr" lists, then we match them index-wise (similar to Python `zip`)
-	// Note that, because rand.Perm only makes a sequence with range [0, n), we need to offset the numbers
-	outRequiredAndPerm := rnd.Perm(and)
-	inRequiredOrPerm := rnd.Perm(or)
+	// Enumerate ALL possible combinations of edges... this will use a lot of aux space
+	andToOr := dll.New[Edge]()
+	orToAnd := dll.New[Edge]()
 
-	var andNodeId, orNodeId int
-	for i := 0; i < min(or, and); i++ {
-		andNodeId = outRequiredAndPerm[i] + andPadding
-		orNodeId = inRequiredOrPerm[i] + 1
-		addEdge(V[andNodeId], V[orNodeId], cycleOk, &V)
-		edge -= 1
-	}
-	// We run out of AND first, use `and` as our starting index for remaining OR nodes
-	// Then connect a random AND to the OR
-	if and < or {
-		for i := and; i < or; i++ {
-			orNodeId = inRequiredOrPerm[i] + 1
-		reroll1:
-			andNodeId = rnd.Intn(and) + andPadding
-			if !addEdge(V[andNodeId], V[orNodeId], cycleOk, &V) {
-				goto reroll1
-			}
-			edge -= 1
-		}
-	} else if or < and {
-		// The opposite situation
-		for i := or; i < and; i++ {
-			andNodeId = outRequiredAndPerm[i] + andPadding
-		reroll2:
-			orNodeId = rnd.Intn(or) + 1
-			if !addEdge(V[andNodeId], V[orNodeId], cycleOk, &V) {
-				goto reroll2
-			}
-			edge -= 1
+	orTargets := makeRange(1, or-1)
+	andTargets := makeRange(andPadding, total)
+
+	// Skip the goal node as it cannot be a source
+	for i := 2; i <= total; i++ {
+		if V[i].Type == AND {
+			andToOr.Add(generateEdges(i, orTargets)...)
+		} else {
+			orToAnd.Add(generateEdges(i, andTargets)...)
 		}
 	}
 
-	// Required LEAF/OR -> AND edges
-	outRequiredOrPerm := rnd.Perm(or + leaf - 1)
-	inRequiredAndPerm := rnd.Perm(and)
-
-	for i := 0; i < min(or+leaf-1, and); i++ {
-		orNodeId = outRequiredOrPerm[i] + 2
-		andNodeId = inRequiredAndPerm[i] + andPadding
-		addEdge(V[orNodeId], V[andNodeId], cycleOk, &V)
-		edge -= 1
-	}
-	// We run out of OR/LEAF first, use `or+leaf-1` as our starting index for remaining AND nodes
-	if or+leaf-1 < and {
-		for i := or + leaf - 1; i < and; i++ {
-			andNodeId = inRequiredAndPerm[i] + andPadding
-		reroll3:
-			orNodeId = rnd.Intn(or+leaf-1) + 2
-			if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
-				goto reroll3
-			}
-			edge -= 1
-		}
-		// The opposite situation
-	} else if and < or+leaf-1 {
-		for i := and; i < or+leaf-1; i++ {
-			orNodeId = outRequiredOrPerm[i] + 2
-		reroll4:
-			andNodeId = rnd.Intn(and) + andPadding
-			if !addEdge(V[orNodeId], V[andNodeId], cycleOk, &V) {
-				goto reroll4
-			}
-			edge -= 1
-		}
-	}
-
-	// First find all nodes with available OCap
-	availSet := hset.New[int]()
-	for i := 1; i <= total; i++ {
-		if V[i].OCap > 0 {
-			availSet.Add(i)
-		}
-	}
-
+	// Randomly pick edges from the universe of all edges
+	// Here we use the ratio of AND vs OR + PF to determine the probability each is drawn
+	andRatio := float64(and / (or + leaf))
+	var target *dll.List[Edge]
 	for edge > 0 {
-		src := rnd.Intn(availSet.Size())
-		var targets *hset.Set[int]
-		if V[src].Type == AND {
-			targets = hset.New[int](makeRange(0, or-1)...)
+		if rnd.Float64() > andRatio {
+			target = orToAnd
 		} else {
-			targets = hset.New[int](makeRange(andPadding, total)...)
+			target = andToOr
 		}
-		targets.Remove(V[src].Adj.Values()...)
-
-		dstIdx := rnd.Intn(targets.Size())
-		it := targets.Iterator()
-		for dstIdx > 0 {
-			it.Next()
-			dstIdx -= 1
-		}
-		dst := it.Value()
-
-		if !addEdge(V[src], V[dst], cycleOk, &V) {
-			continue
+	reroll:
+		idx := rnd.Intn(target.Size())
+		if !attemptAdd(target, idx, !relaxed, cycleOk, &V) {
+			goto reroll
 		} else {
-			if V[src].OCap < 1 {
-				availSet.Remove(src)
-			}
+			edge -= 1
 		}
 	}
 
 	return &V
+}
+
+type Edge struct {
+	Src int
+	Dst int
 }
 
 func makeRange(min, max int) []int {
@@ -190,4 +105,43 @@ func makeRange(min, max int) []int {
 		a[i] = min + i
 	}
 	return a
+}
+
+func generateEdges(src int, dst []int) []Edge {
+	result := make([]Edge, len(dst))
+	for i, v := range dst {
+		result[i] = Edge{src, v}
+	}
+	return result
+}
+
+func attemptAdd(list *dll.List[Edge], target int, deleteAll, cycleOk bool, V *[]*CNode) bool {
+	it := list.Iterator()
+	var result Edge
+
+	for ; it.Index() != target; it.Next() {
+	}
+	result = it.Value()
+
+	if !addEdge((*V)[result.Src], (*V)[result.Dst], cycleOk, V) {
+		return false
+	}
+
+	if deleteAll && (*V)[result.Src].Type == AND {
+		var start, end int
+		// seek to the starting block
+		for ; it.Value().Src == start; it.Prev() {
+		}
+		it.Next()
+		start = it.Index()
+		for ; it.Value().Src == start; it.Next() {
+		}
+		it.Prev()
+		end = it.Index()
+		list.RangeRemove(start, end)
+	} else {
+		list.Remove(target)
+	}
+
+	return true
 }
