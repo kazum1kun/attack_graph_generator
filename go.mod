@@ -1,4 +1,4 @@
-module github.com/kazum1kun/attack_graph_generator
+module github.com/kazum1kun/attack_graph_generator/hashset
 
 go 1.21
 

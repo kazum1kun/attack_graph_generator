@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/kazum1kun/attack_graph_generator/generator"
-	"github.com/kazum1kun/attack_graph_generator/utils"
+	"github.com/kazum1kun/attack_graph_generator/hashset/generator"
+	"github.com/kazum1kun/attack_graph_generator/hashset/utils"
 	"github.com/urfave/cli/v2"
 	"log"
 	"math"
