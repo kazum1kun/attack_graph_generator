@@ -155,7 +155,7 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 	}
 
 	for edge > 0 {
-		src := rnd.Intn(availSet.Size())
+		src := findNodeAt(availSet, rnd.Intn(availSet.Size()))
 		var targets *hset.Set[int]
 		if V[src].Type == AND {
 			targets = hset.New[int](makeRange(0, or-1)...)
@@ -164,13 +164,7 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 		}
 		targets.Remove(V[src].Adj.Values()...)
 
-		dstIdx := rnd.Intn(targets.Size())
-		it := targets.Iterator()
-		for dstIdx > 0 {
-			it.Next()
-			dstIdx -= 1
-		}
-		dst := it.Value()
+		dst := findNodeAt(targets, rnd.Intn(targets.Size()))
 
 		if !addEdge(V[src], V[dst], cycleOk, &V) {
 			continue
@@ -178,6 +172,7 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 			if V[src].OCap < 1 {
 				availSet.Remove(src)
 			}
+			edge--
 		}
 	}
 
@@ -190,4 +185,11 @@ func makeRange(min, max int) []int {
 		a[i] = min + i
 	}
 	return a
+}
+
+func findNodeAt(set2 *hset.Set[int], idx int) int {
+	it := set2.Iterator()
+	for ; it.Index() != idx; it.Next() {
+	}
+	return it.Value()
 }
