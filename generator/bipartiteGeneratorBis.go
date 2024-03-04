@@ -169,6 +169,7 @@ func ConstructGraphAlt(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand
 		if !addEdge(V[src], V[dst], cycleOk, &V) {
 			continue
 		} else {
+			targets.Remove(dst)
 			if V[src].OCap < 1 {
 				availSet.Remove(src)
 			}

@@ -2,7 +2,7 @@ package utils
 
 import (
 	"fmt"
-	"github.com/kazum1kun/attack_graph_generator/generator"
+	"github.com/kazum1kun/attack_graph_generator/hashset/generator"
 	"log"
 	"math/rand"
 	"os"
