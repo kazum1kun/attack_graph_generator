@@ -6,8 +6,8 @@ type NodeType string
 
 const (
 	LEAF NodeType = "LEAF"
-	AND           = "AND"
-	OR            = "OR"
+	AND  NodeType = "AND"
+	OR   NodeType = "OR"
 )
 
 type CNode struct {
