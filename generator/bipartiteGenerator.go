@@ -178,7 +178,12 @@ func ConstructGraph(leaf, and, or, edge int, cycleOk, relaxed bool, rnd *rand.Ra
 
 func addEdge(src, dst *CNode, cycleOk bool, V *[]*CNode) bool {
 	// check for cycles (a cycle is found when the dst predecessors are a subset of src predecessor)
-	if !cycleOk && src.Pred.Contains(dst.Pred.Values()...) {
+	hasCycle := src.Pred.Contains(dst.Pred.Values()...)
+	if !cycleOk && hasCycle {
+		return false
+	}
+	// Do not allow for cycles into an AND node
+	if hasCycle && dst.Type == AND {
 		return false
 	}
 	// do not allow for duplicate edges in any case
